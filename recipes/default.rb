@@ -7,6 +7,8 @@
 # All rights reserved - Do Not Redistribute
 #
 
+# sudo knife cookbook upload mesos-slave-node
+# knife bootstrap IP '{"ipaddr":IP}' -x vagrant -P vagrant -r 'recipe[mesos-slave-node]'
 include_recipe 'apt'
 
 #####
@@ -14,8 +16,8 @@ include_recipe 'apt'
 #####
 cluster_name = 'beehive2'
 chef_ip = '192.168.33.11'
-master_ip = '192.0.1.200'
-slave_ip = '192.0.1.100'
+master_ip = '10.0.3.100'
+slave_ip = node['ipaddr']
 
 apt_repository 'mesosphere' do
   uri "http://repos.mesosphere.io/#{node['platform']}"
@@ -35,7 +37,7 @@ bash "hosts" do
 cat > /etc/hosts <<-EOF2
 127.0.0.1 localhost
 #{chef_ip} chef.picarro.com
-#{master_ip} mm1
+#{master_ip} master1.picarro.com
 
 # The following lines are desirable for IPv6 capable hosts
 ::1 ip6-localhost ip6-loopback
@@ -49,7 +51,7 @@ EOF
 end
 
 execute "install-mesos" do
-    command "apt-get --yes --force-yes install mesos marathon"
+    command "apt-get --yes --force-yes install mesos"
 end
 
 execute "disable-mesos-zk" do
@@ -63,8 +65,7 @@ bash 'create_zk_info' do
     code <<-EOF
         # echo "zk://#{master_ip}:2181/mesos" > /etc/mesos/zk
         echo "#{master_ip}:5050" > /etc/mesos/zk
-        echo "MASTER=`cat /etc/mesos/zk`\nIP=#{slave_ip}\nPORT=5050" > /etc/default/mesos-master
-`
+        echo "MASTER=`cat /etc/mesos/zk`\nIP=#{slave_ip}\n" > /etc/default/mesos-slave
 EOF
     returns [0,2]
 end
