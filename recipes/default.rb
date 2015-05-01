@@ -8,16 +8,19 @@
 #
 
 # sudo knife cookbook upload mesos-slave-node
-# knife bootstrap IP '{"ipaddr":IP}' -x vagrant -P vagrant -r 'recipe[mesos-slave-node]'
+# knife bootstrap IP -j '{"namenodeip":IP, "slaveip":IP}' -x vagrant -P vagrant -r 'recipe[mesos-slave-node]'
 include_recipe 'apt'
 
 #####
 # Params
+# namenodeip: hadoop namenode ip
+# slaveip: ip of self
 #####
-cluster_name = 'beehive2'
+cluster_name = 'beehive'
 chef_ip = '192.168.33.11'
-master_ip = '10.0.3.100'
-slave_ip = node['ipaddr']
+zk = 'zk://10.0.3.100:2181,10.0.3.101:2181,10.0.3.102:2181/mesos'
+namenode_ip = node['namenodeip']
+slave_ip = node['slaveip']
 
 apt_repository 'mesosphere' do
   uri "http://repos.mesosphere.io/#{node['platform']}"
@@ -28,54 +31,36 @@ apt_repository 'mesosphere' do
 end
 
 execute "apt-get-update" do
-    command "apt-get -y update"
-    command "apt-get -y upgrade"
-end
-
-bash "hosts" do
-    code <<-EOF 
-cat > /etc/hosts <<-EOF2
-127.0.0.1 localhost
-#{chef_ip} chef.picarro.com
-#{master_ip} master1.picarro.com
-
-# The following lines are desirable for IPv6 capable hosts
-::1 ip6-localhost ip6-loopback
-fe00::0 ip6-localnet
-ff00::0 ip6-mcastprefix
-ff02::1 ip6-allnodes
-ff02::2 ip6-allrouters
-ff02::3 ip6-allhosts
-EOF2
-EOF
+    command "apt-get -y update; apt-get -y upgrade"
 end
 
 execute "install-mesos" do
     command "apt-get --yes --force-yes install mesos"
 end
 
-execute "disable-mesos-zk" do
-    command "service zookeeper stop"
-    command "service mesos-master stop"
-    command "echo manual > /etc/init/zookeeper.override"
-    command "echo manual > /etc/init/mesos-master.override"
+service "zookeeper" do
+	action :disable
+end
+
+service "mesos-master" do
+	action :disable
+end
+
+bash "disable-mesos-zk" do
+    code <<-EOF
+    service zookeeper stop
+    service mesos-master stop
+    echo manual > /etc/init/zookeeper.override
+    echo manual > /etc/init/mesos-master.override
+EOF
 end
 
 bash 'create_zk_info' do
     code <<-EOF
-        # echo "zk://#{master_ip}:2181/mesos" > /etc/mesos/zk
-        echo "#{master_ip}:5050" > /etc/mesos/zk
-        echo "MASTER=`cat /etc/mesos/zk`\nIP=#{slave_ip}\n" > /etc/default/mesos-slave
+        echo "#{zk}" > /etc/mesos/zk
+        echo "MASTER=\`cat /etc/mesos/zk\`\nIP=#{slave_ip}\n" > /etc/default/mesos-slave
 EOF
     returns [0,2]
-end
-
-bash 'configure_service' do
-    code <<-EOF
-        update-rc.d mesos-master defaults
-        update-rc.d marathon defaults
-        service mesos-master restart
-EOF
 end
 
 execute "start_mesos_slave" do
@@ -111,7 +96,7 @@ end
 bash 'install_hadoop' do
     code <<-EOF
         # Install hadoop 
-        master_ip=#{master_ip}
+        namenode_ip=#{namenode_ip}
         wget http://archive.cloudera.com/cdh4/one-click-install/precise/amd64/cdh4-repository_1.0_all.deb
         dpkg -i cdh4-repository_1.0_all.deb
         curl -s http://archive.cloudera.com/cdh4/ubuntu/precise/amd64/cdh/archive.key | apt-key add -
@@ -132,7 +117,7 @@ bash 'install_hadoop' do
 <configuration>
       <property>
             <name>fs.default.name</name>
-            <value>hdfs://${master_ip}:9000</value>
+            <value>hdfs://${namenode_ip}:9000</value>
       </property>
       <property>
             <name>hadoop.http.staticuser.user</name>
