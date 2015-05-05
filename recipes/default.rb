@@ -17,7 +17,6 @@ include_recipe 'apt'
 # slaveip: ip of self
 #####
 cluster_name = 'beehive'
-chef_ip = '192.168.33.11'
 zk = 'zk://10.0.3.100:2181,10.0.3.101:2181,10.0.3.102:2181/mesos'
 namenode_ip = node['namenodeip']
 slave_ip = node['slaveip']
