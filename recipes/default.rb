@@ -21,6 +21,9 @@ zk = 'zk://10.0.3.100:2181,10.0.3.101:2181,10.0.3.102:2181/mesos'
 namenode_ip = node['namenodeip']
 slave_ip = node['slaveip']
 
+raise "namenodeip not provided. Use -j '{\"namenodeip\":\"a,b.c.d\"}'" if namenode_ip.nil?
+raise "slaveip not provided. Use -j '{\"slaveip\":\"a,b.c.d\"}'" if slave_ip.nil?
+
 apt_repository 'mesosphere' do
   uri "http://repos.mesosphere.io/#{node['platform']}"
   distribution node['lsb']['codename']
